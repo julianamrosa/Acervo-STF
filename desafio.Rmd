@@ -1,0 +1,499 @@
+---
+title: "Desafio - STF"
+author: "Juliana Magalhães Rosa"
+date: "24/09/2021"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage
+
+# Introdução
+
+O Supremo Tribunal Federal é o mais alto órgão do sistema judiciário brasileiro e possui um acervo de processos que deve ser registrado e acompanhado de forma contínua. Neste relatório serão apresentadas algumas características do acervo do STF nos meses de julho, agosto e setembro de 2021.  
+\
+O acervo de julho é composto por 22789 processos, o de agosto por 25835 e o de setembro por 22622. O conjunto de dados possui 31 variáveis que caracterizam esses processos, sendo as mais relevantes para este estudo “Meio do Processo”, “Sem nenhuma decisão”, “Sem decisão final”, “Sobrestado”, “Classe”, “Ramo Direito Novo”, “Partes – Polos Ativos” e “Ano de Data Autuação”. A composição das variáveis é praticamente toda qualitativa, com exceção das que representam datas.  
+\
+Por meio de gráficos, tabelas e indicadores, serão investigadas as seguintes perguntas de pesquisa:  
+\
+1-	Qual foi a evolução do acervo durante os três meses?  
+2-	Qual foi a classe de processo que mais cresceu e a que mais diminuiu durante o período?  
+3-	Qual é o Top 5 ramos do direito que mais aparecem no acervo?  
+4-	Quem são os Top 5 maiores demandantes do Supremo no acervo?  
+5-	Qual é o tempo médio de tramitação dos processos no acervo em cada um dos meses?
+
+```{r pactoes, include=FALSE}
+#Carregando pacotes necessários
+library(readxl) #para importar os dados
+library(dplyr) #para arrumar os dados
+library(knitr) #para criar as tabelas
+library(kableExtra) #opções extras de tabelas
+library(ggplot2) #para criar os gráficos
+```
+
+
+```{r dados, include=FALSE}
+#Importando os dados
+setwd("~/STF") #indica a pasta onde estão esses dados e onde serão salvos o rmd e pdf
+acervos_julho <- read_xlsx("lista_acervo_2021-07-02.xlsx", skip=3)
+acervos_agosto <- read_xlsx("lista_acervo_2021-08-01.xlsx", skip=3)
+acervos_setembro <- read_xlsx("lista_acervo_2021-09-01.xlsx", skip=3)
+#os dados só começavam na quarta linha do arquivo
+```
+
+```{r limpeza de dados, include=FALSE}
+#Removendo linhas vazias
+acervos_julho <- acervos_julho%>%
+  filter(!is.na(Classe))
+acervos_agosto <- acervos_agosto%>%
+  filter(!is.na(Classe))
+acervos_setembro <- acervos_setembro%>%
+  filter(!is.na(Classe))
+#usei a variável "Classe" porque seu valor não é faltante para nenhuma linha
+```
+
+```{r acervo total, include=FALSE}
+#Juntando os dados em um só conjunto de dados chamado acervo
+acervos_julho <- acervos_julho%>%
+  mutate(`Mês`="Julho")
+acervos_agosto <- acervos_agosto%>%
+  mutate(`Mês`="Agosto")
+acervos_setembro <- acervos_setembro%>%
+  mutate(`Mês`="Setembro")
+#Criei uma variável mês primeiro, para poder diferenciar os 3 acervos depois de juntá-los
+acervo <- rbind(acervos_julho, acervos_agosto, acervos_setembro) #juntando
+#Convertendo a variável Mês em fator ordenado
+acervo$Mês <- factor(acervo$Mês, ordered=TRUE, levels=c("Julho", "Agosto", "Setembro"))
+```
+
+\newpage
+
+# Evolução do Acervo de Julho a Setembro
+
+## Processos Físicos vs Eletrônicos
+
+```{r processos eletrônicos, echo=FALSE, fig.width=12, fig.height=8}
+#Gráfico processos eletrônicos
+plot(x=c(7, 8, 9), y=100*c(0.9948, 0.9957, 0.9958), type="b", pch=19, xlab="Mês", ylab="% Processos Eletrônicos", main="Percentual de Processos Eletrônicos ao Longo dos Meses, 2021", ylim=c(99, 100), xaxt = "n", cex.main=1.4, cex.lab=1.4, cex.axis=1.2)
+axis(1, at=c(7, 8, 9), labels=c("Julho", "Agosto", "Setembro"), cex.axis=1.2)
+text(x=7, y=99.4, labels="99.48%", cex=1.2)
+text(x=8, y=99.5, labels="99.57%", cex=1.2)
+text(x=9, y=99.5, labels="99.58%", cex=1.2)
+```
+
+```{r tabela meio do processo, echo=FALSE}
+#Tabela do Meio do Processo para os 3 meses
+t1 <- 100*prop.table(table(acervo$`Meio Processo`, acervo$Mês), 2)
+kable(t1,  col.names=c("Julho (%)", "Agosto (%)", "Setembro (%)"), format="latex", caption="Processos Físicos e Eletrônicos por Mês, 2021.", digits=2)%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+De acordo com as figuras acima, a grande maioria dos processos já está em formato eletrônico. Percebe-se, ainda, um aumento contínuo na proporção desse meio de processo. A tendência é que, no futuro, todos os processos físicos sejam digitalizados.
+
+\newpage
+
+## Decisões nos Processos
+
+```{r processos sem decisões, echo=FALSE, fig.width=12, fig.height=8}
+#Gráfico processos sem decisões
+plot(x=c(7, 8, 9), y=100*c(0.6792, 0.6982, 0.695), type="b", pch=19, xlab="Mês", ylab="% Processos", main="Percentual de Processos Com ou Sem Decisões Tomadas ao Longo dos Meses, 2021", ylim=c(20, 100), xaxt = "n", col="red", cex.main=1.4, cex.lab=1.4, cex.axis=1.2)
+lines(c(7, 8, 9), y=100*c(0.3208, 0.3018, 0.305), type="b", pch=19, col="blue")
+axis(1, at=c(7, 8, 9), labels=c("Julho", "Agosto", "Setembro"), cex.axis=1.2)
+text(x=7, y=65, labels="67.92%", cex=1.2)
+text(x=8, y=67, labels="69.82%", cex=1.2)
+text(x=9, y=67, labels="69.5%", cex=1.2)
+text(x=7, y=30, labels="32.08%", cex=1.2)
+text(x=8, y=28, labels="30.18%", cex=1.2)
+text(x=9, y=28, labels="30.50%", cex=1.2)
+legend(8.5, 95, c("Com Decisões", "Sem Decisões"), fill=c("red", "blue"), cex=1.2)
+```
+
+```{r tabela processos sem decisões, echo=FALSE}
+#Tabela dos processos sem decisões para os 3 meses
+t2 <- 100*prop.table(table(acervo$`Sem nenhuma decisão`, acervo$Mês), 2)
+kable(t2,  col.names=c("Julho (%)", "Agosto (%)", "Setembro (%)"), format="latex", caption="Processos Com e Sem Decisões, 2021.", digits=2)%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+
+*Obs.: Sim = processo sem decisão, Não = processo com decisão.*  
+\
+Os processos que não tiveram decisões tomadas, em todos os meses, representam minoria nos dados.
+De julho a agosto, percebe-se um aumento de quase 2% na proporção dos processos sobre os quais houveram decisões tomadas, registrando uma evolução positiva no andamento dos processos. Já de agosto a setembro, há uma pequena diminuição nessa proporção, mas a mudança é de apenas 0,3%.
+
+```{r processos sem decisões finais, echo=FALSE, fig.width=12, fig.height=8}
+#Gráfico processos sem decisões finais
+plot(x=c(7, 8, 9), y=100*c(0.5384, 0.5719, 0.5549), type="b", pch=19, xlab="Mês", ylab="% Processos", main="Percentual de Processos Com ou Sem Decisões Finais Tomadas ao Longo dos Meses, 2021", ylim=c(35, 70), xaxt = "n", col="red", cex.main=1.4, cex.lab=1.4, cex.axis=1.2)
+lines(c(7, 8, 9), y=100*c(0.4616, 0.4281, 0.4451), type="b", pch=19, col="blue")
+axis(1, at=c(7, 8, 9), labels=c("Julho", "Agosto", "Setembro"), cex.axis=1.2)
+text(x=7, y=51, labels="53.84%", cex=1.2)
+text(x=8, y=55, labels="57.19%", cex=1.2)
+text(x=9, y=53, labels="55.49%", cex=1.2)
+text(x=7, y=44, labels="46.16%", cex=1.2)
+text(x=8, y=40, labels="42.81%", cex=1.2)
+text(x=9, y=42, labels="44.51%", cex=1.2)
+legend(8.5, 67, c("Com Decisões Finais", "Sem Decisões Finais"), fill=c("red", "blue"), cex=1.2)
+```
+
+```{r tabela processos sem decisões finais, echo=FALSE}
+#Tabela dos processos sem decisões finais para os 3 meses
+t3 <- 100*prop.table(table(acervo$`Sem decisão final`, acervo$Mês), 2)
+kable(t3,  col.names=c("Julho (%)", "Agosto (%)", "Setembro (%)"), format="latex", caption="Processos Com e Sem Decisões Finais, 2021.", digits=2)%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+*Obs.: Sim = processo sem decisão final, Não = processo com decisão final.*  
+\
+Observa-se que mais da metade dos processos constam como tendo uma decisão final.
+Ao comparar os valores nos diferentes meses, nota-se que de julho a agosto há um aumento na proporção de processos com decisões finais tomadas. Já de agosto a setembro, essa proporção diminui, mas continua acima do valor apresentado em julho.
+
+\newpage
+
+## Processos Sobrestados
+
+```{r processos sobrestados, echo=FALSE, fig.width=12, fig.height=8}
+#Gráfico processos sobrestados
+plot(x=c(7, 8, 9), y=100*c(0.9821, 0.9845, 0.9822), type="b", pch=19, xlab="Mês", ylab="% Processos Sobrestados", main="Percentual de Processos Sobrestados ao Longo dos Meses, 2021", ylim=c(98, 98.8), xaxt = "n", cex.main=1.4, cex.lab=1.4, cex.axis=1.2)
+axis(1, at=c(7, 8, 9), labels=c("Julho", "Agosto", "Setembro"), cex.axis=1.2)
+text(x=7, y=98.15, labels="98.21%", cex=1.2)
+text(x=8, y=98.35, labels="98.45%", cex=1.2)
+text(x=9, y=98.15, labels="98.22%", cex=1.2)
+```
+
+```{r tabela processos sobrestados, echo=FALSE}
+#Tabela dos processos sobrestados para os 3 meses
+t4 <- 100*prop.table(table(acervo$Sobrestado, acervo$Mês), 2)
+kable(t4,  col.names=c("Julho (%)", "Agosto (%)", "Setembro (%)"), format="latex", caption="Processos Sobrestados, 2021.", digits=2)%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+Entre 1% e 2% dos processos se encontram em estado de sobrestamento, ou seja, em suspensão.
+De julho a agosto ocorreu uma queda no número de processos sobrestados, mas em setembro esse quantitativo volta a subir, representando uma desaceleração na resolução de processos.
+
+```{r Link, include=FALSE}
+#Verificação: Link é únco para cada processo?
+length(unique(acervos_julho$Link))==nrow(acervos_julho)
+length(unique(acervos_agosto$Link))==nrow(acervos_agosto)
+length(unique(acervos_setembro$Link))==nrow(acervos_setembro)
+#Sim! Então pode ser usado como identificador de cada processo
+```
+
+\newpage
+
+## Entrada e Saída de Processos
+
+```{r investigação de julho a agosto, include=FALSE}
+#Calculando quantos processos entraram e saíram entre julho e agosto
+continuam <- 0
+for (i in 1:22789){
+  if (acervos_julho$Link[i] %in% acervos_agosto$Link){
+    continuam <- continuam+1
+  }
+}
+entraram <- length(acervos_agosto$Link)-continuam
+sairam <- length(acervos_julho$Link)-continuam
+#Usei a variável Link para comparar os bancos de dados dos dois meses
+```
+
+```{r investigação de agosto a setembro, include=FALSE}
+#Calculando quantos processos entraram e saíram entre agosto e setembro
+continuam2 <- 0
+for (i in 1:25835){
+  if (acervos_agosto$Link[i] %in% acervos_setembro$Link){
+    continuam2 <- continuam2+1
+  }
+}
+entraram2 <- length(acervos_setembro$Link)-continuam2
+sairam2 <- length(acervos_agosto$Link)-continuam2
+```
+
+```{r gráfico de evolução, echo=FALSE, fig.width=17, fig.height=10}
+#Gráfico de evolução dos processos nos 3 meses
+par(mfrow = c(1, 2))
+barplot(c(continuam, entraram, sairam), names.arg=c("Continuaram", "Entraram", "Saíram"), main="Evolução dos Processos de Julho a Agosto de 2021", ylab="Número de Processos", col="chocolate3", sub="Total: 22789 Processos em Julho", cex.main=1.4, cex.lab=1.4, cex.axis=1.2)
+text(x=0.7, y=21200, labels="22035", cex=1.2)
+text(x=1.9, y=3000, labels="3800", cex=1.2)
+text(x=3.1, y=400, labels="754", cex=1.2)
+barplot(c(continuam2, entraram2, sairam2), names.arg=c("Continuaram", "Entraram", "Saíram"), main="Evolução dos Processos de Agosto a Setembro de 2021", col="chocolate1", sub="Total: 25835 Processos em Agosto", cex.main=1.4, cex.lab=1.4, cex.axis=1.2)
+text(x=0.7, y=16500, labels="17196", cex=1.2)
+text(x=1.9, y=4500, labels="5426", cex=1.2)
+text(x=3.1, y=7700, labels="8639", cex=1.2)
+```
+Entre julho e agosto a entrada de processos foi bem maior do que a saída, resultando em um total de processos maior em agosto quando comparado ao mês anterior.  
+Entre agosto e setembro houve tanto uma entrada como uma saída maior de processos do que no bimestre anterior. Porém, a saída teve uma taxa de crescimento maior e, portanto, o saldo final foi "positivo", já que setembro se encontra com menos processos do que julho. Mas vale lembrar que o mês de setembro ainda não se encerrou, o que pode estar influenciando nesse menor número de processos.  
+\
+Um indicador dessa evolução dos processos no trimestre em questão pode ser calculado da seguinte maneira:
+$$\frac{Processos\ que\ Saíram}{Processos\ que\ Entraram}$$
+Para o bimestre Julho-Agosto, temos o valor de: $$\frac{754}{3800} = 0,19$$  
+Já o bimestre Agosto-Setembro apresenta o valor de: $$\frac{8639}{5426} = 1,59$$  
+Um resultado maior do que 1 representa um saldo "positivo", pois mostra que a saída de processos é maior do que a entrada.  
+Analisando o trimestre Julho-Agosto-Setembro, encontramos: $$\frac{754+8639}{3800+5426} = 1,02 $$ 
+A partir desse indicador, chegamos nas mesmas conclusões que o gráfico acima nos proporcionou, mas de forma mais direta, já que a informação fica resumida em um único número.
+
+\newpage
+
+# Mudanças nas Classes
+
+```{r gráfico Classe, echo=FALSE, fig.height=4}
+#Gráfico para visão geral das mudanças nas classes
+ggplot(acervo, aes(Classe, fill=Mês))+
+  geom_bar(position="dodge")+
+  coord_flip()+
+  theme_light()+
+  theme(axis.text.y=element_text(size=6))+
+  ylab("Número de Processos")+
+  ggtitle("Classes dos Processos para os Meses de Julho, Agosto e Setembro", subtitle="2021")
+```
+
+Para observar as mudanças ao longo dos meses, é necessário olhar de baixo para cima, já que o roxo está em baixo, representando o mês de julho, seguido de agosto em azul e setembro em amarelo.  
+\
+Olhando primeiro para o bimestre Julho-Agosto, vemos que a tendência geral para as classes é de crescimento na frequência. Isso condiz com o aumento total no número de processos entre julho e agosto.
+Como se pode ver facilmente no gráfico, o maior aumento na frequência se dá para a classe **ARE**.  
+Não é fácil perceber decréscimos nas frequências no citado bimestre, porém, há sim uma diminuição de 1 unidade para as classes **STA** e **PPE**, como se pode verificar na tabela abaixo:
+
+```{r J-A, echo=FALSE}
+#Tabela de classes que mais variaram em julho-agosto
+classes_j_a <- acervo%>%filter(Classe %in% c("ARE", "STA", "PPE"))
+t13 <- table(classes_j_a$Classe, classes_j_a$Mês)[, 1:2]
+kable(t13, format="latex", caption="Classes que mais Cresceram e Diminuíram de Julho a Agosto, 2021.")%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+De agosto a setembro, a tendência é contrária: há diminuição nas frequências da maior parte das classes. De novo, há consistência com o comportamento do total de processos nesse período.  
+A queda mais radical ocorre também para a classe **ARE**. Enquanto o único aumento perceptível no gráfico para esse bimestre é visto na classe **MS**.
+
+```{r A-S, echo=FALSE}
+#Tabela de classesque mais variaram em agosto-setembro
+classes_a_s <- acervo%>%filter(Classe %in% c("ARE", "MS"))
+t14 <- table(classes_a_s$Classe, classes_a_s$Mês)[, 2:3]
+kable(t14, format="latex", caption="Classes que mais Cresceram e Diminuíram de Agosto a Setembro, 2021.")%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+Por fim, analisa-se a mudança "geral" nas classes. Essa mudança pode ser investigada pela comparação início-fim (Julho-Setembro).  
+Nesse caso, há maior variedade de comportamento, uma vez que algumas classes aumentam de frequência, enquanto outras diminuem.  
+A tabela a seguir mostra algumas das classes com variações mais notáveis:
+
+```{r J-S, echo=FALSE}
+#Tabela de classesque mais variaram em julho-setembro
+classes_j_s <- (acervo%>%filter(Classe %in% c("ARE", "MS", "Rcl", "RE", "HC", "RHC")))
+t15 <- table(classes_j_s$Classe, classes_j_s$Mês)[, c(1, 3)]
+kable(t15, format="latex", caption="Classes que mais Cresceram e Diminuíram de Julho a Setembro, 2021.")%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+Ao comparar os valores mostrados acima, conclui-se que a classe **ARE** teve o maior aumento na sua frequência, enquanto a classe **HC** teve a maior diminuição.  
+\
+Das mudanças mostradas, as mais relevantes são as das classes **ARE**, **MS** e **HC**, pois as classes **STA** e **PPE** apareceram com diminuições de apenas 1 unidade cada.  
+Sendo assim, o gráfico abaixo apresenta a distribuição de frequências das 3 classes mencionadas:
+
+```{r mudanças Classe, echo=FALSE, fig.height=4}
+#Gráfico para ver mudanças mais relevantes nas Classes
+ggplot(acervo%>%filter(Classe %in% c("ARE", "MS", "HC")), aes(Classe, fill=Mês))+
+  geom_bar(position="dodge", width=0.5)+
+  coord_flip()+
+  theme_light()+
+  ylab("Número de Processos")+
+  ggtitle("Classes que mais Mudaram ao longo dos Meses", subtitle="2021")
+```
+
+De fato, a classe **ARE** foi a que mais cresceu ao longo dos 3 meses. Essa classe é também a maior entre todas, iniciando com 8604 processos em julho e acabando com 8697 em setembro, tendo chegado a mais de 10 mil processos em agosto.  
+A classe que apresentou maior diminuição no período em estudo foi a **HC**, que em julho tinha 2415 processos e em setembro está com 2199, variando em 216 processos.
+
+\newpage
+
+# Maiores Ramos do Direito
+
+```{r ranking ramos, include=FALSE}
+#Ordenando Ramos em ranking
+ramos_ordenados <- names(as.list(sort(table(acervo$`Ramo Direito Novo`))))
+acervo$`Ramo Direito Novo` <- factor(acervo$`Ramo Direito Novo`, ordered=TRUE, levels=ramos_ordenados)
+```
+
+
+```{r ramos gráfico, echo=FALSE, fig.width=15, fig.height=8}
+#Gráfico dos Ramos por Mês
+ggplot(acervo)+
+  geom_bar(aes(`Ramo Direito Novo`, fill=Mês))+
+  coord_flip()+
+  facet_wrap(~Mês)+
+  theme_light()+
+  theme(legend.position = "none", title=element_text(size=20), axis.title=element_text(size=18), axis.text.x=element_text(size=14, face="bold", angle=30), axis.text.y=element_text(size=12, face="bold"))+
+  xlab("Ramos do Direito")+
+  ylab("Número de Processos")+
+  ggtitle("Ranking dos Ramos do Direito por Mês", subtitle="2021")
+```
+
+Pelo gráfico acima, observa-se que a distribuição de frequências dos ramos do direito é muito similar para os 3 meses.  
+Também é bem direta a conclusão de que os 5 maiores ramos são:  
+\
+1- Direito Administrativo e Outras Matérias de Direito Público;  
+2- Direito Processual Penal;  
+3- Direito Tributário;  
+4- Direito Processual Civil e do Trabalho;  
+5- Direito Penal.  
+\
+Para observar mais de perto a mudança desse top 5 ramos ao longo dos 3 meses, segue a tabela abaixo, que mostra as proporções que cada ramo representa dentro do respectivo mês:
+
+```{r ramos tabela, echo=FALSE}
+#Tabela comparativa dos top 5 ramos ao longo dos meses
+top5_ramos <- acervo%>%filter(`Ramo Direito Novo` %in% c("DIREITO ADMINISTRATIVO E OUTRAS MATÉRIAS DE DIREITO PÚBLICO", "DIREITO PENAL", "DIREITO PROCESSUAL CIVIL E DO TRABALHO", "DIREITO PROCESSUAL PENAL", "DIREITO TRIBUTÁRIO"))
+top5_ramos$`Ramo Direito Novo` <- as.character(top5_ramos$`Ramo Direito Novo`)
+t16 <- 100*prop.table(table(top5_ramos$`Ramo Direito Novo`, top5_ramos$Mês), 2)
+kable(t16,  col.names=c("Julho (%)", "Agosto (%)", "Setembro (%)"), format="latex", caption="Top 5 Ramos do Direito ao Longo dos Meses, 2021.", digits=2)%>%
+  kable_styling(latex_options = "hold_position", font_size = 8)
+```
+
+Para o ramo *Direito Administrativo e Outras Matérias de Direito Público*, observa-se um pequeno aumento na proporção de julho a setembro. Ou seja, o maior ramo do acervo continua crescendo, e no mês de setembro chega a representar 50% dos processos.  
+Outro ramo que demonstrou crescimento de julho a setembro foi o ramo *Direito Processual Civil e do Trabalho*.  
+Já os demais ramos diminuíram nesse período.  
+A pequena dimensão dessas mudanças, agora vistas em termos quantitativos, corrobora a impressão geral que o gráfico passou: a distribuição dos ramos se mantém praticamente a mesma ao longo dos meses.
+
+\newpage
+
+# Maiores Demandantes do STF
+
+```{r ramos julho, include=FALSE}
+#Localizando quais polos ativos têm uma contagem de mais de 200 processos em julho
+tabela_demandantes_julho <- table(acervos_julho$`Partes - Polos Ativos`)
+which(tabela_demandantes_julho>200)
+#Por que 200? Primeiro olhei para >100 e houve um retorno de 10 polos. Subindo para 200 consegui exatamente o top 5 que eu queria
+```
+
+```{r ramos agosto, include=FALSE}
+#Localizando quais polos ativos têm uma contagem de mais de 200 processos em agosto
+tabela_demandantes_agosto <- table(acervos_agosto$`Partes - Polos Ativos`)
+which(tabela_demandantes_agosto>200)
+```
+
+```{r ramos setembro, include=FALSE}
+#Localizando quais polos ativos têm uma contagem de mais de 200 processos em setembro
+tabela_demandantes_setembro<- table(acervos_setembro$`Partes - Polos Ativos`)
+which(tabela_demandantes_setembro>200)
+```
+
+```{r demandantes gráfico, echo=FALSE}
+#Gráfico do top 5 demandantes
+top5_demandantes <- acervo%>%filter(`Partes - Polos Ativos` %in% c("ESTADO DE SÃO PAULO", "INSTITUTO NACIONAL DO SEGURO SOCIAL - INSS", "MINISTÉRIO PÚBLICO FEDERAL", "PROCURADOR-GERAL DA REPÚBLICA", "UNIÃO"))
+ggplot(top5_demandantes)+
+  geom_bar(aes(`Partes - Polos Ativos`), fill="blue1", alpha=0.8)+
+  theme_light()+
+  scale_x_discrete(labels=c("SP", "INSS", "MPF", "PGR", "União"))+
+  xlab("Demandantes")+
+  ylab("Número de Processos")+
+  ggtitle("Top 5 Maiores Demandantes do STF", subtitle="2021")
+```
+
+O gráfico acima mostra os 5 polos ativos mais comuns do acervo. A *União* lidera esse ranking com quase 2500 processos. Em 2º lugar se encontra o *Procurador Geral da República (PGR)*, seguido de perto pelo *Estado de São Paulo (SP)*, ambos com uma contagem de mais de 1250 processos. Depois, vemos o *Instituto Nacional do Seguro Social (INSS)* com pouco menos de 1000 processos e, por último, o *Ministério Público Federal (MPF)* com aproximadamente 750 processos.  
+Será que essa configuração permanece ao longo dos 3 meses?
+
+```{r demandantes gráfico mensal, echo=FALSE}
+#Gráfico do top 5 demandantes por mês
+ggplot(top5_demandantes)+
+  geom_bar(aes(`Partes - Polos Ativos`, fill=Mês), position="dodge")+
+  facet_wrap(~Mês)+
+  theme_light()+
+  theme(legend.position = "none")+
+  scale_x_discrete(labels=c("SP", "INSS", "MPF", "PGR", "União"))+
+  xlab("Demandantes")+
+  ylab("Número de Processos")+
+  ggtitle("Top 5 Maiores Demandantes do STF por Mês", subtitle="2021")
+```
+
+Os 5 maiores demandantes são sempre os mesmos ao longo dos 3 meses, mas algumas pequenas mudanças podem ser observadas na configuração.  
+No mês de agosto, é possível notar que a ordem dos polos difere em relação ao gráfico anterior. A diferença é que o *Estado de São Paulo* é o 2º maior demandante nesse mês, ultrapassando o *Procurador Geral da República*. Já em julho e setembro não há essa diferença, pois o *PGR* continua na 2ª posição.  
+Além disso, o *Ministério Público Federal* teve uma considerável diminuição no mês de setembro, enquanto o *Estado de São Paulo* apresentou aumento ao longo dos meses.
+
+\newpage
+
+# Tempo Médio de Tramitação dos Processos
+
+Para tirar conclusões relevantes sobre o tempo médio de tramitação dos processos no STF de forma geral, seria necessário utilizar processos que já saíram de trâmite. Porém, nos acervos de julho, agosto e setembro de 2021, existe apenas 1 processo que tenha saído oficialmente de tramitação.
+
+```{r tramitação 1, include=FALSE}
+#Achando processos que saíram de tramitação
+andamentos_que_tiram_de_tramite <- c("Remessa indevida", "Remessa externa dos autos, Guia nº", "Autos restaurados", "Baixa ao arquivo do STF, Guia nº", "Baixa definitiva dos autos, Guia nº", "Cancelamento de autuação", "Processo findo", "Reautuado", "Remessa dos autos ao juízo competente, Guia nº", "Autos devolvidos à origem", "Devolução por impossibilidade de processamento", "Baixa dos autos - distribuição cancelada", "Processo recebido na origem", "Comunicado provimento de agravo, Ofício nº", "Autos entregues ao advogado", "Apensado ao Processo nº", "Agravo de Instrumento apensado ao RE nº", "Retificação de autuação")
+
+fora_de_tramite <- acervo%>%filter(`Andamento Atual` %in% andamentos_que_tiram_de_tramite)
+fora_de_tramite$`Andamento Atual` #dando uma olhada nos andamentos que apareceram
+#Peguei a lista de andamentos que tiram de tramitação aqui: https://glossariostf.gitbook.io/glossario/dimensoes/acervo#processos-em-tramitacao-acervo
+```
+
+```{r tramitação 2, include=FALSE}
+#O único andamento que apareceu ali em cima foi "Apensado ao Processo nº". Para esse andamento, apenas os processos com classes PPE, AI e AC é que realmente saíram de tramitação. Então vamos selecionar esses
+fora_de_tramite <- fora_de_tramite%>%filter(Classe %in% c("PPE", "AI", "AC"))
+t17 <- fora_de_tramite%>%select(Número, Classe, `Ano de Data Autuação`, `Data Andamento Atual`, `Andamento Atual`)
+```
+
+```{r tramitação tabela, echo=FALSE}
+#Só sobrou um processo fora de trâmite... vamos dar uma olhada nele
+#Tabela do processo fora de tramitação
+kable(t17, format="latex", caption="Processo Fora de Trâmite, 2021.")%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+Esse processo foi autuado em 2015 e saiu de tramitação em 2021, ou seja, esteve em trâmite por 6 anos.  
+Como não há muita informação sobre processos já concluídos, é interessante olhar para o tempo de tramitação "até agora". Vamos, então, investigar o tempo de tramitação dos processos que se encontram atualmente no acervo do tribunal.
+
+```{r tempo de tramitação, include=FALSE}
+#Criando uma variável do tempo de tramitação (até agora) dos processos
+acervo <- acervo%>%
+  mutate(`Tempo de Tramitação`=2021-as.integer(`Ano de Data Autuação`))
+acervos_julho <- acervos_julho%>%
+  mutate(`Tempo de Tramitação`=2021-as.integer(`Ano de Data Autuação`))
+acervos_agosto <- acervos_agosto%>%
+  mutate(`Tempo de Tramitação`=2021-as.integer(`Ano de Data Autuação`))
+acervos_setembro <- acervos_setembro%>%
+  mutate(`Tempo de Tramitação`=2021-as.integer(`Ano de Data Autuação`))
+#Como esses processos estão em tramitação até hoje, usei 2021 menos ano de autuação
+```
+
+```{r tempo médio, include=FALSE}
+#Calculando o tempo médio de tramitação
+tmt_geral <- mean(acervo$`Tempo de Tramitação`)
+tmt_julho <- mean(acervos_julho$`Tempo de Tramitação`)
+tmt_agosto <- mean(acervos_agosto$`Tempo de Tramitação`)
+tmt_setembro <- mean(acervos_setembro$`Tempo de Tramitação`)
+```
+
+```{r gráfico tempo de tramitação, echo=FALSE}
+#Gráfico de tempo de tramitação
+ggplot(acervo)+
+  geom_boxplot(aes(`Tempo de Tramitação`), fill="darkolivegreen4", outlier.shape=8, outlier.alpha=0.3)+
+  theme_light()+
+  theme(axis.text.y=element_blank())+
+  ggtitle("Tempo de Tramitação dos Processos", subtitle="2021")+
+  geom_vline(xintercept=tmt_geral, color="red")+
+  annotate("text", x=6, y=-0.35, label= "Média: 1.44", color="red")+
+  ylab("")
+```
+
+Podemos perceber que há maior concentração de processos perto de 0 e 1 anos, em termos de tempo de tramitação. Isso quer dizer que a maioria dos processos presentes no acervo foram autuados em 2020 ou em 2021.  
+São visíveis no gráfico duas medidas centrais: a média de 1,44 (em vermelho) e a mediana de 0 (em preto).  
+Além disso, é possível localizar diversos valores extremos. Os asteriscos mais escuros, que se dão pela sobreposição, indicam que existem vários processos com tempo de tramitação de até 25 anos.  
+Existe, ainda, um processo que está em tramitação há 52 anos.
+
+```{r tabela tempo médio, echo=FALSE}
+#Tabela do tempo médio de tramitação
+t18 <- rbind(c("Geral", "Julho", "Agosto", "Setembro"), round(c(tmt_geral, tmt_julho, tmt_agosto, tmt_setembro), 2))
+kable(t18, format="latex", caption="Tempo Médio de Tramitação dos Processos no Acervo, 2021.")%>%
+  kable_styling(latex_options = "hold_position")
+```
+
+Por fim, ao analisarmos os tempos médios de tramitação para os 3 meses, notamos que esse valor decresce de julho a agosto, mas volta a crescer em setembro.  
+A diminuição de julho a agosto provavelmente se dá pela entrada de novos processos autuados em 2021. Esse é o palpite que vem de maneira natural porque já se sabe que em agosto houve um aumento significativo no total de processos do acervo.  
+Já o aumento em setembro pode representar uma evasão de processos "recentes" (que foram autuados nos últimos anos).
+
+\newpage
+
+# Conclusões
+
+Mesmo em um período relativamente curto, de apenas 3 meses, foi possível observar diversas mudanças no acervo do STF. No mês de agosto o acervo teve um crescimento de mais de 3000 processos. Além disso, ao longo do trimestre, observou-se um aumento na proporção de processos eletrônicos, que está cada vez mais se aproximando de 100%. Também foi atestado que o tribunal tomou várias decisões sobre os processos nesse período, uma vez que o percentual de processos com decisões (finais ou não) cresceu de julho a setembro.  
+\
+A proporção de processos em estado de sobrestamento cresceu muito em agosto e depois caiu em setembro, mas continuou acima do seu valor inicial de julho, então deve haver certa atenção a essa variável. Os maiores demandantes do tribunal são constantes e sua proporção nos dados apresenta pouquíssima variação. As classes dos processos também não variaram muito ao longo dos meses, mas houve pequenos crescimentos e diminuições. Por fim, o tempo médio de tramitação dos processos do acervo, que é de 1,44 anos, está relativamente baixo, mas deve haver atenção aos processos que apresentam um tempo de tramitação extremamente alto, como o processo que está em trâmite há 52 anos.
